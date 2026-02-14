@@ -11,6 +11,23 @@ class Settings(BaseSettings):
     
     LOG_LEVEL: str = "INFO"
 
+    # ─── Cost-Aware Routing Policy ──────────────────────
+    # Daily cost limit per provider (USD). Exceeded → deprioritize.
+    DAILY_COST_LIMIT_GROQ: float = 5.0
+    DAILY_COST_LIMIT_OPENROUTER: float = 10.0
+
+    # Latency spike threshold (ms). Above → deprioritize.
+    LATENCY_SPIKE_MS: float = 5000.0
+
+    # Scoring weights (lower score = preferred provider)
+    WEIGHT_LATENCY: float = 0.3
+    WEIGHT_FALLBACK: float = 0.3
+    WEIGHT_COST: float = 0.4
+
+    # Cost per 1K tokens (USD) — estimates for scoring
+    COST_PER_1K_GROQ: float = 0.0003
+    COST_PER_1K_OPENROUTER: float = 0.002
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 @lru_cache

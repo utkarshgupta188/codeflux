@@ -128,5 +128,27 @@ export interface SimulateChangeResponse {
     circular_risk: boolean;
 }
 
+// Cost Metrics Types
+export interface ProviderCostInfo {
+    daily_cost_usd: number;
+    requests_today: number;
+    failures_today: number;
+    avg_latency_ms: number;
+    fallback_rate: number;
+}
+
+export interface CostPolicy {
+    daily_limits: Record<string, number>;
+    latency_spike_ms: number;
+    weights: { latency: number; fallback: number; cost: number };
+    cost_per_1k_tokens: Record<string, number>;
+}
+
+export interface CostMetricsResponse {
+    date: string;
+    providers: Record<string, ProviderCostInfo>;
+    policy: CostPolicy;
+}
+
 // Navigation
 export type PageId = 'scanner' | 'metrics' | 'gateway' | 'graph';

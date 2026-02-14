@@ -11,4 +11,7 @@ class RequestLog(Base):
     model_used = Column(String, nullable=False)
     latency_ms = Column(Float, nullable=False)
     fallback_used = Column(Boolean, default=False)
+    tokens_used = Column(Integer, default=0)
+    estimated_cost = Column(Float, default=0.0)
+    routing_reason = Column(String, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)

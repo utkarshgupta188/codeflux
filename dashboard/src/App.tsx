@@ -6,6 +6,7 @@ import { GatewayPlayground } from './components/GatewayPlayground';
 import { GraphViewer } from './components/GraphViewer';
 import { RepoChat } from './components/RepoChat';
 import { ImpactSimulator } from './components/ImpactSimulator';
+import { CostDashboard } from './components/CostDashboard';
 import { apiService } from './services/repoService';
 import type { PageId } from './types';
 
@@ -122,7 +123,12 @@ function App() {
         )}
 
         {/* Metrics Page */}
-        {activePage === 'metrics' && <MetricsDashboard />}
+        {activePage === 'metrics' && (
+          <div className="space-y-6">
+            <MetricsDashboard />
+            <CostDashboard />
+          </div>
+        )}
 
         {/* Gateway Playground Page */}
         {activePage === 'gateway' && <GatewayPlayground />}

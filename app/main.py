@@ -59,6 +59,9 @@ async def log_request_background(
     model: str,
     latency_ms: float,
     fallback_used: bool,
+    tokens_used: int = 0,
+    estimated_cost: float = 0.0,
+    routing_reason: str | None = None,
 ):
     """
     Independent wrapper to manually manage DB session for background task.
@@ -68,7 +71,10 @@ async def log_request_background(
     async with AsyncSessionLocal() as session:
         try:
             await LoggingService.log_request(
-                session, prompt, provider, model, latency_ms, fallback_used
+                session, prompt, provider, model, latency_ms, fallback_used,
+                tokens_used=tokens_used,
+                estimated_cost=estimated_cost,
+                routing_reason=routing_reason,
             )
         except Exception as e:
             logger.error(f"Failed to log request: {e}")
@@ -127,7 +133,10 @@ async def chat_endpoint(
             provider=provider,
             model=model,
             latency_ms=latency_ms,
-            fallback_used=fallback_used
+            fallback_used=fallback_used,
+            tokens_used=result.get("tokens_used", 0) if 'result' in locals() else 0,
+            estimated_cost=result.get("estimated_cost", 0.0) if 'result' in locals() else 0.0,
+            routing_reason=result.get("routing_reason") if 'result' in locals() else None,
         )
 
 @app.get("/metrics/summary", response_model=MetricsSummary)
@@ -139,6 +148,40 @@ async def get_metrics(
     Get aggregated system metrics for a specific time range.
     """
     return await MetricsService.get_summary(db, range)
+
+
+@app.get("/metrics/cost")
+async def get_cost_metrics():
+    """
+    Real-time cost metrics from in-memory tracker.
+    Returns daily cost per provider, scoring state, and policy config.
+    """
+    from app.services.router import cost_tracker
+    from app.config import get_settings
+    s = get_settings()
+
+    snapshot = cost_tracker.get_snapshot()
+
+    return {
+        "date": str(cost_tracker._date),
+        "providers": snapshot,
+        "policy": {
+            "daily_limits": {
+                "groq": s.DAILY_COST_LIMIT_GROQ,
+                "openrouter": s.DAILY_COST_LIMIT_OPENROUTER,
+            },
+            "latency_spike_ms": s.LATENCY_SPIKE_MS,
+            "weights": {
+                "latency": s.WEIGHT_LATENCY,
+                "fallback": s.WEIGHT_FALLBACK,
+                "cost": s.WEIGHT_COST,
+            },
+            "cost_per_1k_tokens": {
+                "groq": s.COST_PER_1K_GROQ,
+                "openrouter": s.COST_PER_1K_OPENROUTER,
+            },
+        },
+    }
 
 @app.get("/health")
 async def health_check():
@@ -230,6 +273,9 @@ async def ask_repo(
         model=result["model"],
         latency_ms=latency_ms,
         fallback_used=result.get("fallback_used", False),
+        tokens_used=result.get("tokens_used", 0),
+        estimated_cost=result.get("estimated_cost", 0.0),
+        routing_reason=result.get("routing_reason"),
     )
 
     return RepoAnswer(

@@ -5,6 +5,7 @@ class ChatRequest(BaseModel):
     prompt: str = Field(..., description="The input user prompt")
     task_type: Optional[str] = Field(None, description="Type of task (e.g., summary, extraction)")
     preferred_model: Optional[str] = Field(None, description="Explicit model override")
+    preferred_provider: Optional[str] = Field(None, description="Explicit provider override (groq or openrouter)")
     system_prompt: Optional[str] = Field(None, description="System instruction")
 
 class ChatResponse(BaseModel):

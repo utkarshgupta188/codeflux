@@ -64,26 +64,46 @@ export const GatewayPlayground: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-xs text-gray-500 uppercase tracking-wider block mb-1.5">Provider (optional)</label>
+                            <label className="text-xs text-gray-500 uppercase tracking-wider block mb-1.5">Provider</label>
                             <select
                                 value={provider}
-                                onChange={(e) => setProvider(e.target.value)}
+                                onChange={(e) => {
+                                    setProvider(e.target.value);
+                                    setModel(''); // Reset model when provider changes
+                                }}
                                 className="input w-full py-2.5"
                             >
-                                <option value="">Auto-route</option>
+                                <option value="">Auto-route (Best)</option>
                                 <option value="groq">Groq</option>
                                 <option value="openrouter">OpenRouter</option>
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs text-gray-500 uppercase tracking-wider block mb-1.5">Model (optional)</label>
-                            <input
-                                type="text"
+                            <label className="text-xs text-gray-500 uppercase tracking-wider block mb-1.5">Model</label>
+                            <select
                                 value={model}
                                 onChange={(e) => setModel(e.target.value)}
-                                placeholder="e.g. llama-3.3-70b-versatile"
                                 className="input w-full py-2.5"
-                            />
+                            >
+                                <option value="">Default (Auto)</option>
+                                {(provider === 'groq' || !provider) && (
+                                    <optgroup label="Groq Models">
+                                        <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
+                                        <option value="llama3-70b-8192">Llama 3 70B</option>
+                                        <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+                                        <option value="gemma-7b-it">Gemma 7B</option>
+                                    </optgroup>
+                                )}
+                                {(provider === 'openrouter' || !provider) && (
+                                    <optgroup label="OpenRouter Models">
+                                        <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                        <option value="openai/gpt-4o">GPT-4o</option>
+                                        <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
+                                        <option value="mistralai/mistral-7b-instruct">Mistral 7B</option>
+                                        <option value="google/gemini-pro">Gemini Pro</option>
+                                    </optgroup>
+                                )}
+                            </select>
                         </div>
                     </div>
 

@@ -13,13 +13,13 @@ class OpenRouterAdapter(BaseModelAdapter):
 
     async def generate(self, prompt: str, system_prompt: Optional[str] = None, model: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """
-        Calls OpenRouter API using standard HTTPX (lighter than full OpenAI client for this case).
+        Calls OpenRouter API. Returns response + token usage for cost tracking.
         """
         target_model = model or self.default_model
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "HTTP-Referer": "https://ai-gateway.internal", # Required by OpenRouter
+            "HTTP-Referer": "https://ai-gateway.internal",
             "X-Title": "AI Gateway",
         }
 
@@ -45,9 +45,16 @@ class OpenRouterAdapter(BaseModelAdapter):
             data = resp.json()
             
             content = data["choices"][0]["message"]["content"]
+
+            # Extract token usage from OpenRouter response
+            tokens = 0
+            usage = data.get("usage", {})
+            if usage:
+                tokens = usage.get("total_tokens", 0) or 0
             
             return {
                 "response": content,
                 "model": target_model,
-                "provider": "openrouter"
+                "provider": "openrouter",
+                "tokens_used": tokens,
             }

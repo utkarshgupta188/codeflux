@@ -13,7 +13,7 @@ class GroqAdapter(BaseModelAdapter):
 
     async def generate(self, prompt: str, system_prompt: Optional[str] = None, model: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """
-        Calls Groq API.
+        Calls Groq API. Returns response + token usage for cost tracking.
         """
         target_model = model or self.default_model
         messages = []
@@ -23,15 +23,20 @@ class GroqAdapter(BaseModelAdapter):
         
         messages.append({"role": "user", "content": prompt})
 
-        # We don't catch errors here; we let them propagate to the router for handling/fallback.
         completion = await self.client.chat.completions.create(
             model=target_model,
             messages=messages,
             **kwargs
         )
 
+        # Extract token usage from completion object
+        tokens = 0
+        if hasattr(completion, "usage") and completion.usage:
+            tokens = getattr(completion.usage, "total_tokens", 0) or 0
+
         return {
             "response": completion.choices[0].message.content,
             "model": target_model,
-            "provider": "groq"
+            "provider": "groq",
+            "tokens_used": tokens,
         }

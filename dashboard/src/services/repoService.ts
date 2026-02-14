@@ -1,4 +1,4 @@
-import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse, GraphResponse, RepoAnswer, SimulateChangeResponse } from '../types';
+import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse, GraphResponse, RepoAnswer, SimulateChangeResponse, CostMetricsResponse } from '../types';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -89,6 +89,13 @@ class ApiService {
             const err = await response.json().catch(() => ({ detail: 'Simulation failed' }));
             throw new Error(err.detail || 'Failed to simulate change');
         }
+        return response.json();
+    }
+
+    // ─── Cost Metrics ────────────────────────────────────────
+    async getCostMetrics(): Promise<CostMetricsResponse> {
+        const response = await fetch(`${API_BASE}/metrics/cost`);
+        if (!response.ok) throw new Error('Failed to fetch cost metrics');
         return response.json();
     }
 }

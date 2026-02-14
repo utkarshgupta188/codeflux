@@ -14,8 +14,10 @@ from app.services.logger import LoggingService
 from app.services.metrics import MetricsService
 from app.services.scanner import ScannerService
 from app.services.graph_service import GraphService
+from app.services.context_builder import ContextBuilder
 from app.models.repo import RepoScanRequest, ScanResult, RepoHealth
 from app.models.graph_schemas import GraphResponse
+from pydantic import BaseModel
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -164,3 +166,73 @@ async def get_repo_health(scan_id: str):
 async def get_repo_graph(scan_id: str, db: AsyncSession = Depends(get_db)):
     """Returns the structural code graph for a completed scan."""
     return await GraphService.get_graph(scan_id, db)
+
+
+# ─── AI-Powered Repo Q&A ─────────────────────────────────
+
+class RepoQuestion(BaseModel):
+    question: str
+
+class RepoAnswer(BaseModel):
+    answer: str
+    provider_used: str
+    latency_ms: float
+
+@app.post("/repo/{scan_id}/ask", response_model=RepoAnswer)
+async def ask_repo(
+    scan_id: str,
+    body: RepoQuestion,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    AI-powered repository Q&A.
+    Builds structured context from graph + health data,
+    injects it as system prompt, routes through Groq/OpenRouter.
+    """
+    import time
+    start = time.time()
+
+    # 1. Build context
+    try:
+        ctx = await ContextBuilder.build_context(scan_id, db)
+    except Exception as e:
+        logger.error(f"Context build failed for {scan_id}: {e}")
+        raise HTTPException(status_code=404, detail="Scan data not found or graph not built yet.")
+
+    if ctx.total_symbols == 0:
+        raise HTTPException(status_code=404, detail="No graph data available. Scan or re-scan the repository first.")
+
+    # 2. Build system prompt
+    system_prompt = ContextBuilder.build_system_prompt(ctx)
+
+    # 3. Route through gateway
+    chat_request = ChatRequest(
+        prompt=body.question,
+        system_prompt=system_prompt,
+        task_type="code_analysis",
+    )
+
+    try:
+        result = await router_service.route_request(chat_request)
+    except Exception as e:
+        logger.error(f"AI routing failed: {e}")
+        raise HTTPException(status_code=502, detail="All AI providers unavailable.")
+
+    latency_ms = (time.time() - start) * 1000
+
+    # 4. Log in background
+    background_tasks.add_task(
+        log_request_background,
+        prompt=f"[repo-ask:{scan_id}] {body.question}",
+        provider=result["provider"],
+        model=result["model"],
+        latency_ms=latency_ms,
+        fallback_used=result.get("fallback_used", False),
+    )
+
+    return RepoAnswer(
+        answer=result["response"],
+        provider_used=result["provider"],
+        latency_ms=round(latency_ms, 2),
+    )

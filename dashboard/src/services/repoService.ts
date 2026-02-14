@@ -1,4 +1,4 @@
-import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse, GraphResponse, RepoAnswer } from '../types';
+import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse, GraphResponse, RepoAnswer, SimulateChangeResponse } from '../types';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -74,6 +74,20 @@ class ApiService {
         if (!response.ok) {
             const err = await response.json().catch(() => ({ detail: 'Ask failed' }));
             throw new Error(err.detail || 'Failed to get answer');
+        }
+        return response.json();
+    }
+
+    // ─── Impact Simulation ───────────────────────────────────
+    async simulateChange(scanId: string, file?: string, symbol?: string, depthLimit?: number): Promise<SimulateChangeResponse> {
+        const response = await fetch(`${API_BASE}/repo/${scanId}/simulate-change`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file, symbol, depth_limit: depthLimit ?? 5 }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ detail: 'Simulation failed' }));
+            throw new Error(err.detail || 'Failed to simulate change');
         }
         return response.json();
     }

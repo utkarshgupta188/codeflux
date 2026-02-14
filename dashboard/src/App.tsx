@@ -5,6 +5,7 @@ import { MetricsDashboard } from './components/MetricsDashboard';
 import { GatewayPlayground } from './components/GatewayPlayground';
 import { GraphViewer } from './components/GraphViewer';
 import { RepoChat } from './components/RepoChat';
+import { ImpactSimulator } from './components/ImpactSimulator';
 import { apiService } from './services/repoService';
 import type { PageId } from './types';
 
@@ -134,10 +135,13 @@ function App() {
               <p className="text-gray-500 text-sm">AST graph visualization & AI-powered Q&A</p>
             </div>
             {activeRepoId ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <GraphViewer scanId={activeRepoId} />
-                <RepoChat scanId={activeRepoId} />
-              </div>
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <GraphViewer scanId={activeRepoId} />
+                  <RepoChat scanId={activeRepoId} />
+                </div>
+                <ImpactSimulator scanId={activeRepoId} />
+              </>
             ) : (
               <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
                 <p className="text-gray-500 text-sm">Scan a repository first to visualize its code graph.</p>

@@ -103,5 +103,30 @@ export interface RepoAnswer {
     latency_ms: number;
 }
 
+// Impact Simulation Types
+export interface SimulateChangeRequest {
+    file?: string;
+    symbol?: string;
+    depth_limit?: number;
+}
+
+export interface AffectedSymbol {
+    name: string;
+    qualified_name: string;
+    type: string;
+    file: string;
+    depth: number;
+}
+
+export interface SimulateChangeResponse {
+    affected_files: string[];
+    affected_symbols: AffectedSymbol[];
+    impact_score: number;
+    risk_increase: number;
+    max_depth: number;
+    total_affected: number;
+    circular_risk: boolean;
+}
+
 // Navigation
 export type PageId = 'scanner' | 'metrics' | 'gateway' | 'graph';

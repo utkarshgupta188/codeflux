@@ -1,4 +1,4 @@
-import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse } from '../types';
+import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse, GraphResponse } from '../types';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -55,6 +55,13 @@ class ApiService {
         } catch {
             return false;
         }
+    }
+
+    // ─── Structural Graph ────────────────────────────────────
+    async getGraph(scanId: string): Promise<GraphResponse> {
+        const response = await fetch(`${API_BASE}/repo/${scanId}/graph`);
+        if (!response.ok) throw new Error('Failed to fetch graph');
+        return response.json();
     }
 }
 

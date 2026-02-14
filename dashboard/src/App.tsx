@@ -3,6 +3,7 @@ import { RepoScanner } from './components/RepoScanner';
 import { HealthDashboard } from './components/HealthDashboard';
 import { MetricsDashboard } from './components/MetricsDashboard';
 import { GatewayPlayground } from './components/GatewayPlayground';
+import { GraphViewer } from './components/GraphViewer';
 import { apiService } from './services/repoService';
 import type { PageId } from './types';
 
@@ -22,6 +23,7 @@ function App() {
 
   const navItems: { id: PageId; label: string; icon: string }[] = [
     { id: 'scanner', label: 'Repo Scanner', icon: '🔍' },
+    { id: 'graph', label: 'Graph', icon: '🧠' },
     { id: 'metrics', label: 'Metrics', icon: '📊' },
     { id: 'gateway', label: 'AI Gateway', icon: '🤖' },
   ];
@@ -48,8 +50,8 @@ function App() {
                 key={item.id}
                 onClick={() => setActivePage(item.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${activePage === item.id
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-400 hover:text-white hover:bg-dark-700/50'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-white hover:bg-dark-700/50'
                   }`}
               >
                 <span>{item.icon}</span>
@@ -61,7 +63,7 @@ function App() {
           {/* Status Badge */}
           <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-dark-900/50 px-3 py-1.5 rounded-full border border-dark-700">
             <span className={`w-2 h-2 rounded-full ${backendUp === null ? 'bg-gray-500 animate-pulse' :
-                backendUp ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+              backendUp ? 'bg-green-500 animate-pulse' : 'bg-red-500'
               }`} />
             {backendUp === null ? 'Checking…' : backendUp ? 'Connected' : 'Offline'}
           </div>
@@ -74,8 +76,8 @@ function App() {
               key={item.id}
               onClick={() => setActivePage(item.id)}
               className={`flex-1 py-2.5 text-center text-xs font-medium transition-all ${activePage === item.id
-                  ? 'text-primary-400 border-b-2 border-primary-500 bg-primary-500/5'
-                  : 'text-gray-500'
+                ? 'text-primary-400 border-b-2 border-primary-500 bg-primary-500/5'
+                : 'text-gray-500'
                 }`}
             >
               <span className="block text-base mb-0.5">{item.icon}</span>
@@ -122,6 +124,29 @@ function App() {
 
         {/* Gateway Playground Page */}
         {activePage === 'gateway' && <GatewayPlayground />}
+
+        {/* Graph Visualization Page */}
+        {activePage === 'graph' && (
+          <div className="space-y-4">
+            <div className="text-center mb-2">
+              <h2 className="text-2xl font-bold text-white mb-1">Structural Code Graph</h2>
+              <p className="text-gray-500 text-sm">AST-based analysis of Python repositories</p>
+            </div>
+            {activeRepoId ? (
+              <GraphViewer scanId={activeRepoId} />
+            ) : (
+              <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
+                <p className="text-gray-500 text-sm">Scan a repository first to visualize its code graph.</p>
+                <button
+                  onClick={() => setActivePage('scanner')}
+                  className="mt-3 px-4 py-2 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-500 transition-colors"
+                >
+                  Go to Scanner →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Footer */}

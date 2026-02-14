@@ -58,5 +58,39 @@ export interface ChatResponse {
     latency_ms: number;
 }
 
+// Graph Types
+export interface SymbolNode {
+    id: string;
+    name: string;
+    qualified_name: string | null;
+    type: 'module' | 'class' | 'function' | 'method' | 'import';
+    file: string;
+    start_line: number;
+    end_line: number;
+}
+
+export interface GraphEdge {
+    source_id: string;
+    target_id: string;
+    relation: 'defines' | 'calls' | 'imports';
+}
+
+export interface CyclePath {
+    cycle: string[];
+    type: 'import' | 'call';
+}
+
+export interface GraphResponse {
+    scan_id: string;
+    total_files: number;
+    total_symbols: number;
+    total_edges: number;
+    nodes: SymbolNode[];
+    edges: GraphEdge[];
+    circular_dependencies: CyclePath[];
+}
+
+export type ViewMode = 'file' | 'symbol';
+
 // Navigation
-export type PageId = 'scanner' | 'metrics' | 'gateway';
+export type PageId = 'scanner' | 'metrics' | 'gateway' | 'graph';

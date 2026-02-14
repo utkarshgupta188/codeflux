@@ -92,5 +92,16 @@ export interface GraphResponse {
 
 export type ViewMode = 'file' | 'symbol';
 
+// Repo Q&A Types
+export interface RepoQuestion {
+    question: string;
+}
+
+export interface RepoAnswer {
+    answer: string;
+    provider_used: string;
+    latency_ms: number;
+}
+
 // Navigation
 export type PageId = 'scanner' | 'metrics' | 'gateway' | 'graph';

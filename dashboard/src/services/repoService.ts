@@ -1,4 +1,4 @@
-import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse, GraphResponse } from '../types';
+import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse, GraphResponse, RepoAnswer } from '../types';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -61,6 +61,20 @@ class ApiService {
     async getGraph(scanId: string): Promise<GraphResponse> {
         const response = await fetch(`${API_BASE}/repo/${scanId}/graph`);
         if (!response.ok) throw new Error('Failed to fetch graph');
+        return response.json();
+    }
+
+    // ─── AI Repo Q&A ─────────────────────────────────────────
+    async askRepo(scanId: string, question: string): Promise<RepoAnswer> {
+        const response = await fetch(`${API_BASE}/repo/${scanId}/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ detail: 'Ask failed' }));
+            throw new Error(err.detail || 'Failed to get answer');
+        }
         return response.json();
     }
 }

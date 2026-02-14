@@ -4,6 +4,7 @@ import { HealthDashboard } from './components/HealthDashboard';
 import { MetricsDashboard } from './components/MetricsDashboard';
 import { GatewayPlayground } from './components/GatewayPlayground';
 import { GraphViewer } from './components/GraphViewer';
+import { RepoChat } from './components/RepoChat';
 import { apiService } from './services/repoService';
 import type { PageId } from './types';
 
@@ -88,7 +89,7 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
+      <main className={`flex-1 mx-auto w-full px-6 py-8 ${activePage === 'graph' ? 'max-w-[1400px]' : 'max-w-6xl'}`}>
         {/* Repo Scanner Page */}
         {activePage === 'scanner' && (
           <div className="space-y-8">
@@ -129,11 +130,14 @@ function App() {
         {activePage === 'graph' && (
           <div className="space-y-4">
             <div className="text-center mb-2">
-              <h2 className="text-2xl font-bold text-white mb-1">Structural Code Graph</h2>
-              <p className="text-gray-500 text-sm">AST-based analysis of Python repositories</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Code Intelligence</h2>
+              <p className="text-gray-500 text-sm">AST graph visualization & AI-powered Q&A</p>
             </div>
             {activeRepoId ? (
-              <GraphViewer scanId={activeRepoId} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <GraphViewer scanId={activeRepoId} />
+                <RepoChat scanId={activeRepoId} />
+              </div>
             ) : (
               <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
                 <p className="text-gray-500 text-sm">Scan a repository first to visualize its code graph.</p>

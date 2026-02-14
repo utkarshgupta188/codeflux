@@ -15,6 +15,7 @@ from app.services.metrics import MetricsService
 from app.services.scanner import ScannerService
 from app.services.graph_service import GraphService
 from app.services.context_builder import ContextBuilder
+from app.services.impact_service import ImpactService
 from app.models.repo import RepoScanRequest, ScanResult, RepoHealth
 from app.models.graph_schemas import GraphResponse
 from pydantic import BaseModel
@@ -235,4 +236,54 @@ async def ask_repo(
         answer=result["response"],
         provider_used=result["provider"],
         latency_ms=round(latency_ms, 2),
+    )
+
+
+# ─── Change Impact Simulation ──────────────────────────────
+
+class SimulateChangeRequest(BaseModel):
+    file: str | None = None
+    symbol: str | None = None
+    depth_limit: int = 5
+
+class SimulateChangeResponse(BaseModel):
+    affected_files: list[str]
+    affected_symbols: list[dict]
+    impact_score: float
+    risk_increase: float
+    max_depth: int
+    total_affected: int
+    circular_risk: bool
+
+@app.post("/repo/{scan_id}/simulate-change", response_model=SimulateChangeResponse)
+async def simulate_change(
+    scan_id: str,
+    body: SimulateChangeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Deterministic change impact simulation.
+    BFS traversal of the structural graph to compute blast radius.
+    """
+    if not body.file and not body.symbol:
+        raise HTTPException(status_code=400, detail="Provide at least 'file' or 'symbol'.")
+
+    depth = min(max(body.depth_limit, 1), 10)  # clamp 1-10
+
+    result = await ImpactService.simulate(
+        scan_id=scan_id,
+        file=body.file,
+        symbol=body.symbol,
+        max_depth=depth,
+        db=db,
+    )
+
+    return SimulateChangeResponse(
+        affected_files=result.affected_files,
+        affected_symbols=result.affected_symbols,
+        impact_score=result.impact_score,
+        risk_increase=result.risk_increase,
+        max_depth=result.max_depth,
+        total_affected=result.total_affected,
+        circular_risk=result.circular_risk,
     )

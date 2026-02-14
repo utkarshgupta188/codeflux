@@ -12,6 +12,10 @@ from app.models.metrics import MetricsSummary, TimeRange
 from app.services.router import RoutingService
 from app.services.logger import LoggingService
 from app.services.metrics import MetricsService
+from app.services.scanner import ScannerService
+from app.services.graph_service import GraphService
+from app.models.repo import RepoScanRequest, ScanResult, RepoHealth
+from app.models.graph_schemas import GraphResponse
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +38,16 @@ app = FastAPI(
     description="Control plane for routing AI requests with fallback strategies.",
     version="1.0.0",
     lifespan=lifespan
+)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 async def log_request_background(
@@ -126,3 +140,27 @@ async def get_metrics(
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+# Repository Scanner Routes
+@app.post("/repo/scan", response_model=ScanResult)
+async def scan_repo(request: RepoScanRequest):
+    return await ScannerService.start_scan(request)
+
+@app.get("/repo/{scan_id}/status", response_model=ScanResult)
+async def get_scan_status(scan_id: str):
+    try:
+        return ScannerService.get_status(scan_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+@app.get("/repo/{scan_id}/health", response_model=RepoHealth)
+async def get_repo_health(scan_id: str):
+    try:
+        return ScannerService.get_health(scan_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Health data not found")
+
+@app.get("/repo/{scan_id}/graph", response_model=GraphResponse)
+async def get_repo_graph(scan_id: str, db: AsyncSession = Depends(get_db)):
+    """Returns the structural code graph for a completed scan."""
+    return await GraphService.get_graph(scan_id, db)

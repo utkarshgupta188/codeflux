@@ -151,4 +151,4 @@ export interface CostMetricsResponse {
 }
 
 // Navigation
-export type PageId = 'scanner' | 'metrics' | 'gateway' | 'graph';
+export type PageId = 'scanner' | 'metrics' | 'gateway' | 'graph' | 'agent';

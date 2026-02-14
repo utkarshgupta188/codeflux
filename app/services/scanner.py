@@ -10,11 +10,41 @@ from app.models.repo import RepoScanRequest, ScanResult, ScanStatus, ScanStats, 
 
 logger = logging.getLogger("scanner")
 
-# In-memory storage for V1
-SCANS: Dict[str, ScanResult] = {}
-HEALTH_DATA: Dict[str, RepoHealth] = {}
-
 class ScannerService:
+    # In-memory storage with persistence
+    SCANS: Dict[str, ScanResult] = {}
+    HEALTH_DATA: Dict[str, RepoHealth] = {}
+    
+    SCANS_FILE = os.path.join("data", "scans.json")
+    HEALTH_FILE = os.path.join("data", "health.json")
+
+    @staticmethod
+    def _save_state():
+        try:
+            os.makedirs("data", exist_ok=True)
+            with open(ScannerService.SCANS_FILE, "w", encoding="utf-8") as f:
+                json_data = {k: v.model_dump() for k, v in ScannerService.SCANS.items()}
+                json.dump(json_data, f, indent=2)
+            with open(ScannerService.HEALTH_FILE, "w", encoding="utf-8") as f:
+                json_data = {k: v.model_dump() for k, v in ScannerService.HEALTH_DATA.items()}
+                json.dump(json_data, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save scanner state: {e}")
+
+    @staticmethod
+    def _load_state():
+        try:
+            if os.path.exists(ScannerService.SCANS_FILE):
+                with open(ScannerService.SCANS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    ScannerService.SCANS = {k: ScanResult(**v) for k, v in data.items()}
+            if os.path.exists(ScannerService.HEALTH_FILE):
+                with open(ScannerService.HEALTH_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    ScannerService.HEALTH_DATA = {k: RepoHealth(**v) for k, v in data.items()}
+            logger.info(f"Loaded {len(ScannerService.SCANS)} scans and {len(ScannerService.HEALTH_DATA)} health entries.")
+        except Exception as e:
+            logger.error(f"Failed to load scanner state: {e}")
     @staticmethod
     async def start_scan(request: RepoScanRequest) -> ScanResult:
         scan_id = str(uuid.uuid4())
@@ -24,7 +54,8 @@ class ScannerService:
             scanId=scan_id,
             status=ScanStatus.pending
         )
-        SCANS[scan_id] = result
+        ScannerService.SCANS[scan_id] = result
+        ScannerService._save_state()
         
         # Start background processing
         asyncio.create_task(ScannerService._process_scan(scan_id, request))
@@ -35,7 +66,8 @@ class ScannerService:
     async def _process_scan(scan_id: str, request: RepoScanRequest):
         try:
             # Update to scanning
-            SCANS[scan_id].status = ScanStatus.scanning
+            ScannerService.SCANS[scan_id].status = ScanStatus.scanning
+            ScannerService._save_state()
             
             # Simulate processing time for realistic feel on small repos
             await asyncio.sleep(1) 
@@ -47,6 +79,8 @@ class ScannerService:
                     raise ValueError(f"Path not found: {request.path}")
                 
                 scan_path = request.path
+                # Set rootPath for agent
+                ScannerService.SCANS[scan_id].rootPath = scan_path
                 stats, complexities = ScannerService._scan_directory(request.path)
             
             else:
@@ -59,57 +93,110 @@ class ScannerService:
                 if not request.path.startswith(("http://", "https://")):
                     raise ValueError("Invalid GitHub URL")
 
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    # Clone depth 1 for speed
-                    try:
-                        proc = await asyncio.create_subprocess_exec(
-                            "git", "clone", "--depth", "1", request.path, temp_dir,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE
+                # Permanent storage for scan results
+                repo_storage = os.path.join("data", "repos", scan_id)
+                os.makedirs(repo_storage, exist_ok=True)
+                
+                import subprocess
+                # Clone depth 1 for speed
+                try:
+                    # Use sync subprocess in thread for Windows compatibility
+                    def clone():
+                        return subprocess.run(
+                            ["git", "clone", "--depth", "1", request.path, repo_storage],
+                            capture_output=True,
+                            text=True,
+                            check=True
                         )
-                        stdout, stderr = await proc.communicate()
+                    
+                    await asyncio.to_thread(clone)
                         
-                        if proc.returncode != 0:
-                            raise ValueError(f"Failed to clone repository: {stderr.decode().strip()}")
-                            
-                    except FileNotFoundError:
-                        raise ValueError("Git not installed on server")
-                    
-                    scan_path = temp_dir
-                    stats, complexities = ScannerService._scan_directory(temp_dir)
-                    
-                    # Build graph INSIDE tempdir context (before cleanup)
-                    SCANS[scan_id].stats = stats
-                    SCANS[scan_id].status = ScanStatus.completed
-                    ScannerService._generate_health(scan_id, stats, complexities)
-                    await ScannerService._build_graph(scan_id, temp_dir)
-                    return  # Skip the post-block code
+                except subprocess.CalledProcessError as e:
+                    raise ValueError(f"Failed to clone repository: {e.stderr.strip() if e.stderr else str(e)}")
+                except FileNotFoundError:
+                    raise ValueError("Git not installed on server")
+                
+                scan_path = repo_storage
+                # Set rootPath for agent
+                ScannerService.SCANS[scan_id].rootPath = scan_path
+                stats, complexities = ScannerService._scan_directory(scan_path)
+                
+                # Build graph
+                ScannerService.SCANS[scan_id].stats = stats
+                ScannerService.SCANS[scan_id].status = ScanStatus.completed
+                ScannerService._generate_health(scan_id, stats, complexities)
+                
+                # Get commit hash for GitHub repo
+                commit_hash = await ScannerService._get_git_commit(scan_path)
+                await ScannerService._build_graph(scan_id, scan_path, commit_hash)
+                return 
             
-            SCANS[scan_id].stats = stats
-            SCANS[scan_id].status = ScanStatus.completed
+            ScannerService.SCANS[scan_id].stats = stats
+            ScannerService.SCANS[scan_id].status = ScanStatus.completed
             
             # Generate Health Data using real stats
             ScannerService._generate_health(scan_id, stats, complexities)
             
             # Trigger AST graph build for local repos
             if scan_path:
-                asyncio.create_task(ScannerService._build_graph(scan_id, scan_path))
+                commit_hash = await ScannerService._get_git_commit(scan_path)
+                asyncio.create_task(ScannerService._build_graph(scan_id, scan_path, commit_hash))
             
+            ScannerService._save_state()
         except Exception as e:
-            SCANS[scan_id].status = ScanStatus.failed
-            SCANS[scan_id].error = str(e)
+            logger.exception(f"[{scan_id}] Scan processing failed")
+            if scan_id in ScannerService.SCANS:
+                ScannerService.SCANS[scan_id].status = ScanStatus.failed
+                # Ensure we capture a message even if e is weird
+                ScannerService.SCANS[scan_id].error = f"{type(e).__name__}: {str(e)}" if str(e) else f"Internal Error: {type(e).__name__}"
 
     @staticmethod
-    async def _build_graph(scan_id: str, path: str):
+    async def _get_git_commit(path: str) -> str:
+        """Extract current git commit hash, defaulting to 'unknown'."""
+        try:
+            import subprocess
+            def get_commit():
+                return subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=path,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                ).stdout.strip()
+            
+            return await asyncio.to_thread(get_commit)
+        except Exception:
+            return "unknown"
+
+    @staticmethod
+    async def _build_graph(scan_id: str, path: str, commit_hash: str):
         """Run AST graph analysis with its own DB session."""
         try:
             from app.utils.db import AsyncSessionLocal
             from app.services.graph_service import GraphService
             async with AsyncSessionLocal() as session:
-                await GraphService.build_graph(scan_id, path, session)
-                logger.info(f"[{scan_id}] Graph build complete")
+                # build_graph now needs to return the repo_id or we need to query it
+                # GraphService.build_graph is void. 
+                # Let's Modify GraphService.build_graph to return repo_id? 
+                # Or just query it here.
+                
+                await GraphService.build_graph(scan_id, path, commit_hash, session)
+                
+                # Fetch repo_id to update ScanResult
+                from app.models.version import RepoVersion
+                from sqlalchemy import select
+                result = await session.execute(select(RepoVersion).where(RepoVersion.scan_id == scan_id))
+                version = result.scalar_one_or_none()
+                
+                if version and scan_id in ScannerService.SCANS:
+                    ScannerService.SCANS[scan_id].repoId = version.repo_id
+
+                logger.info(f"[{scan_id}] Graph build complete (commit={commit_hash})")
         except Exception as e:
             logger.error(f"[{scan_id}] Graph build failed: {e}")
+            if scan_id in ScannerService.SCANS:
+                ScannerService.SCANS[scan_id].status = ScanStatus.failed
+                ScannerService.SCANS[scan_id].error = f"Graph build failed: {str(e)}"
 
     @staticmethod
     def _scan_directory(path: str) -> Tuple[ScanStats, List[Tuple[str, int]]]:
@@ -236,7 +323,7 @@ class ScannerService:
             for path, score in top_hotspots
         ]
         
-        HEALTH_DATA[scan_id] = RepoHealth(
+        ScannerService.HEALTH_DATA[scan_id] = RepoHealth(
             repoId=scan_id,
             riskScore=risk_score,
             circularDependencies=0, # Use dedicated tool for this normally
@@ -246,12 +333,15 @@ class ScannerService:
 
     @staticmethod
     def get_status(scan_id: str) -> ScanResult:
-        if scan_id not in SCANS:
+        if scan_id not in ScannerService.SCANS:
             raise KeyError("Scan ID not found")
-        return SCANS[scan_id]
+        return ScannerService.SCANS[scan_id]
 
     @staticmethod
     def get_health(repo_id: str) -> RepoHealth:
-        if repo_id not in HEALTH_DATA:
+        if repo_id not in ScannerService.HEALTH_DATA:
             raise KeyError("Health data not found")
-        return HEALTH_DATA[repo_id]
+        return ScannerService.HEALTH_DATA[repo_id]
+
+# Load existing state on startup
+ScannerService._load_state()

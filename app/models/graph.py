@@ -37,6 +37,7 @@ def _uuid() -> str:
     return str(uuid.uuid4())
 
 
+
 class Repository(Base):
     __tablename__ = "repositories"
 
@@ -45,23 +46,25 @@ class Repository(Base):
     root_path = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    files = relationship("GraphFile", back_populates="repository", cascade="all, delete-orphan")
+    versions = relationship("RepoVersion", back_populates="repository", cascade="all, delete-orphan")
 
 
 class GraphFile(Base):
     __tablename__ = "graph_files"
 
     id = Column(String, primary_key=True, default=_uuid)
-    repo_id = Column(String, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False)
+    # version_id replaces repo_id as the parent
+    version_id = Column(String, ForeignKey("repo_versions.id", ondelete="CASCADE"), nullable=False)
     path = Column(Text, nullable=False)          # relative to repo root
     module_name = Column(String, nullable=True)   # dotted: app.services.scanner
 
-    repository = relationship("Repository", back_populates="files")
+    version = relationship("RepoVersion", back_populates="files")
     symbols = relationship("Symbol", back_populates="file", cascade="all, delete-orphan")
 
     __table_args__ = (
-        Index("ix_graphfile_repo", "repo_id"),
+        Index("ix_graphfile_version", "version_id"),
     )
+
 
 
 class Symbol(Base):

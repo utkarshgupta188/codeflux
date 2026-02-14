@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { repoService } from '../services/repoService';
 import type { ScanResult, RepoScanRequest } from '../types';
+import { DiffViewer } from './DiffViewer';
 
 interface Props {
     onScanComplete: (repoId: string) => void;
 }
 
 export const RepoScanner: React.FC<Props> = ({ onScanComplete }) => {
+    // ... (inside RepoScanner component)
     const [path, setPath] = useState('');
     const [source, setSource] = useState<RepoScanRequest['source']>('github');
     const [scanState, setScanState] = useState<ScanResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [versions, setVersions] = useState<any[]>([]);
 
     // Detect if running on localhost
     const isLocalhost = useMemo(() => {
@@ -23,10 +26,21 @@ export const RepoScanner: React.FC<Props> = ({ onScanComplete }) => {
         setSource(isLocalhost ? 'local' : 'github');
     }, [isLocalhost]);
 
+    // Fetch versions when scan completes
+    const fetchVersions = async (repoId: string) => {
+        try {
+            const vs = await repoService.getVersions(repoId);
+            setVersions(vs);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const startScan = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setScanState(null);
+        setVersions([]); // Reset versions
         try {
             const result = await repoService.scanRepo({ path, source });
             setScanState(result);
@@ -46,6 +60,15 @@ export const RepoScanner: React.FC<Props> = ({ onScanComplete }) => {
                 setScanState(update);
                 if (update.status === 'completed') {
                     onScanComplete(update.scanId);
+                    // Attempt to fetch versions using scanId as a proxy for repoId?
+                    // No, backend endpoint /repo/{id}/versions expects repo_id.
+                    // I'll update backend to return repoId in ScanResult next.
+                    // For now, assume update.scanId is what we have.
+                    // Actually, let's query versions by scan_id if I change the backend.
+                    // OR: I modify `ScanResult` in backend to include `repoId`.
+                    if ((update as any).repoId) {
+                        fetchVersions((update as any).repoId);
+                    }
                 }
             } catch (err) {
                 console.error('Polling error', err);
@@ -54,6 +77,33 @@ export const RepoScanner: React.FC<Props> = ({ onScanComplete }) => {
 
         return () => clearInterval(interval);
     }, [scanState, onScanComplete]);
+
+    // We need repoId to fetch versions.
+    // Currently ScanResult has scanId.
+    // The backend `ScannerService.start_scan` returns `ScanResult` which has `scanId`.
+    // The `_process_scan` creates a `Repository` which has `id` (repo_id).
+    // But `ScanResult` struct doesn't have `repoId`.
+    // I should fix backend `ScanResult` to include `repoId` when complete, OR lookup repo by scanId.
+    // `main.py` has `GET /repo/{id}/versions` where id is `repo_id`.
+    // `GET /repo/{id}/status` returns `ScanResult`.
+
+    // Quick fix: Assuming for now we can't easily get repoId from scanId without backend change.
+    // Let's update backend `ScannerService` to populate `repoId` in `ScanResult` when complete.
+    // Actually, `RepoVersion.scan_id` is indexed.
+    // So I can lookup `RepoVersion` by `scan_id` to getting `repo_id`.
+
+    // Modification: I'll update `RepoScanner` to fetch versions using existing `repoId` if available?
+    // No, I need the `repoId` from the scan.
+
+    // Wait, the existing `onScanComplete(repoId)` prop implies the parent knows about `repoId`.
+    // `App.tsx` passes `setSelectedRepo(id)`.
+    // But how does `RepoScanner` know `repoId`?
+    // `onScanComplete` is called with `update.scanId` in current code (lines 48).
+
+    // I will verify `ScanResult` definition in backend.
+
+    // For now, I'll paste the DiffViewer integration, but I suspect I might need to patch backend
+    // to return `repoId` in `ScanResult`.
 
     const statusIcon = (status: string) => {
         switch (status) {
@@ -187,6 +237,13 @@ export const RepoScanner: React.FC<Props> = ({ onScanComplete }) => {
                             <StatItem label="Deps" value={scanState.stats.dependencies} icon="📦" />
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* DiffViewer Integration */}
+            {versions.length > 1 && versions[0]?.repo_id && (
+                <div className="mt-8 border-t border-gray-700 pt-6">
+                    <DiffViewer repoId={versions[0].repo_id} versions={versions} />
                 </div>
             )}
         </div>

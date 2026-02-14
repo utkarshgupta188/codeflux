@@ -98,6 +98,28 @@ class ApiService {
         if (!response.ok) throw new Error('Failed to fetch cost metrics');
         return response.json();
     }
+
+    async getVersions(repoId: string): Promise<any[]> {
+        const response = await fetch(`${API_BASE}/repo/${repoId}/versions`);
+        if (!response.ok) throw new Error('Failed to fetch versions');
+        return response.json();
+    }
+
+    async getDiff(repoId: string, base: string, head: string): Promise<any> {
+        const response = await fetch(`${API_BASE}/repo/${repoId}/diff?base=${base}&head=${head}`);
+        if (!response.ok) throw new Error('Failed to fetch diff');
+        return response.json();
+    }
+
+    async runAgent(repoId: string, prompt: string): Promise<any> {
+        const response = await fetch(`${API_BASE}/agent/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ repo_id: repoId, prompt })
+        });
+        if (!response.ok) throw new Error('Agent run failed');
+        return response.json();
+    }
 }
 
 export const apiService = new ApiService();

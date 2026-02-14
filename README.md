@@ -8,27 +8,22 @@ A production-grade AI Gateway with intelligent routing, real-time observability,
 - **Multi-Provider Support**: Groq (primary) + OpenRouter (fallback) with automatic failover.
 - **Cost-Aware Intelligent Routing**: Routes based on a scoring formula: `Latency × W + Cost × W + Failures × W`.
 - **Policy Enforcement**: Automatically deprioritizes providers that exceed daily cost limits or have latency spikes.
-- **Async & Resilient**: Built on `asyncio` for high concurrency.
+
+### 🔍 Enhanced Repository Scanner
+- **Deep Scanning**: Parses Python codebases to build a structural dependency graph.
+- **Commit-Aware Versioning**: Tracks every scan with git commit hashes and stores historical snapshots.
+- **Diff Engine**: Computes metric deltas (complexity, risk) and structural changes (added/removed symbols/files) between any two versions.
+- **Interactive Visualization**: 2D force-directed graph of your codebase with diff-aware color coding.
+
+### 🕵️‍♂️ Agentic Code Analysis
+- **Autonomous Exploration**: A "Claude-Code" style agent that uses tools to explore, read, and analyze code.
+- **Tool-Calling Loop**: Uses `read_file`, `search_code`, `list_files`, and `get_hotspots` to hunt for bugs or explain logic.
+- **Multi-Repo Isolation**: Strictly isolated tool context ensuring accuracy across multiple concurrent scans.
+- **Execution Engine**: Powered by `llama-3.3-70b-versatile` for high-fidelity reasoning.
 
 ### 💰 Real-Time Cost Dashboard
-- **Live Budget Tracking**: Monitor daily provider spend against configured limits.
-- **Routing Insights**: View real-time provider scores, average latency, and fallback rates.
-- **Policy Config**: Visualize active routing policies (latency penalties, cost weights).
-
-### 🔍 Repository Scanner & Graph Engine
-- **Deep Scanning**: Parses Python/JS/TS codebases to build a structural dependency graph.
-- **AST Parsing**: Extracts `classes`, `functions`, `imports`, and `calls` to map relationships.
-- **Health Analysis**: Detects circular dependencies and calculates complexity scores.
-- **Interactive Visualization**: 2D/3D force-directed graph of your codebase.
-
-### 💬 AI-Powered Repo Q&A
-- **Context-Aware Chat**: Ask questions about your codebase (e.g., "How does auth work?").
-- **RAG Pipeline**: Retrieves relevant code context from the graph before answering.
-
-### 💥 Change Impact Simulator
-- **Predictive Analysis**: Simulate changes to a file or symbol to see what breaks.
-- **Impact Scoring**: Calculates risk based on dependency depth and breadth.
-- **Visual Feedback**: highlights affected files and specific symbols in the dependency chain.
+- **Live Budget Tracking**: Monitor daily provider spend and fallback rates.
+- **Policy Config**: Visualize and adjust routing penalties and weights.
 
 ---
 
@@ -41,11 +36,11 @@ cd codeflux
 # 1. Configure
 cp .env.example .env   
 # Add your GROQ_API_KEY and OPENROUTER_API_KEY
-# Optional: Adjust COST_PER_1K_*, DAILY_COST_LIMIT_*, etc.
 
 # 2. Backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+# RECOMMENDED: Limit reload scope for stability during GitHub scans
+uvicorn app.main:app --reload --reload-dir app
 
 # 3. Frontend (separate terminal)
 cd dashboard
@@ -54,43 +49,39 @@ npm install && npm run dev
 
 ## 📚 API Endpoints
 
+### Repository Intelligence
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/repo/scan` | AST scan of local path or GitHub URL |
+| `GET`  | `/repo/{id}/versions` | List historical versions & commit hashes |
+| `GET`  | `/repo/diff` | Compare metrics and structure between versions |
+| `POST` | `/agent/run` | Execute the autonomous AI Agent loop |
+| `POST` | `/repo/{id}/simulate-change` | BFS-based change impact analysis |
+
 ### AI Gateway
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/chat` | Send AI prompt (auto-routed or manual override) |
-| `GET` | `/metrics/summary` | Aggregate metrics (latency, vol, fallback rate) |
-| `GET` | `/metrics/cost` | Real-time cost tracking & policy status |
-
-### Repository Intelligence
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/repo/scan` | detailed AST scan of local/remote repo |
-| `GET` | `/repo/{id}/graph` | Full node/edge dependency graph |
-| `POST` | `/repo/{id}/ask` | RAG-based Q&A about the codebase |
-| `POST` | `/repo/{id}/simulate-change` | BFS-based change impact analysis |
-| `GET` | `/repo/{id}/health` | Health report & circular deps |
+| `GET`  | `/metrics/cost` | Real-time cost tracking & policy status |
 
 ## 🏗 Project Structure
 
 ```
 app/
-├── adapters/          # AI Providers (Groq, OpenRouter)
-├── models/            # Pydantic Schemas & SQLAlchemy ORM
 ├── services/
-│   ├── ast_visitor.py  # AST Parsing (Python)
-│   ├── graph_service.py # Graph logic & cycle detection
-│   ├── impact_service.py # BFS Impact Simulation
-│   ├── router.py       # Cost-aware routing logic
-│   └── logger.py       # Async logging
+│   ├── agent/          # Autonomous AI Agent & Tools
+│   ├── scanner.py      # Version-aware repo scanner
+│   ├── diff_service.py # Graph & Metric diffing engine
+│   ├── graph_service.py # Versioned graph storage
+│   └── router.py       # Cost-aware AI routing
 └── main.py            # FastAPI Routes
 
 dashboard/             # React + Vite + TailwindCSS
 ├── src/components/    
-│   ├── CostDashboard.tsx    # Live budget & policy view
-│   ├── ImpactSimulator.tsx  # Change impact UI
-│   ├── RepoChat.tsx         # AI Q&A Interface
-│   ├── GraphViewer.tsx      # Interactive Graph Viz
-│   └── GatewayPlayground.tsx # AI Routing Tester
+│   ├── AgentChat.tsx    # Autonomous Agent interface
+│   ├── DiffViewer.tsx   # Version comparison UI
+│   ├── RepoScanner.tsx  # Scanner with version history
+│   └── CostDashboard.tsx # Budget & Policy tracking
 ```
 
 ## 🐳 Docker

@@ -42,7 +42,7 @@ class GraphService:
     # ── Public ───────────────────────────────────────
 
     @staticmethod
-    async def build_graph(scan_id: str, repo_path: str, db: AsyncSession) -> None:
+    async def build_graph(scan_id: str, repo_path: str, commit_hash: str, db: AsyncSession) -> None:
         """
         Full pipeline: walk → parse → resolve → persist → detect cycles.
         Runs heavy file I/O in a thread pool.
@@ -62,8 +62,28 @@ class GraphService:
         logger.info(f"[{scan_id}] Parsed {len(analyses)} files successfully")
 
         # 3. Build DB entities
-        repo_id = _uuid()
-        repo = Repository(id=repo_id, scan_id=scan_id, root_path=str(root))
+        # Check if Repository exists for this path
+        result = await db.execute(select(Repository).where(Repository.root_path == str(root)))
+        repo = result.scalars().first()
+        
+        if not repo:
+            repo_id = _uuid()
+            repo = Repository(id=repo_id, scan_id=scan_id, root_path=str(root))
+            db.add(repo)
+            await db.flush() # Get ID
+        else:
+            repo_id = repo.id
+
+        # Create Version
+        from app.models.version import RepoVersion
+        version_id = _uuid()
+        version = RepoVersion(
+            id=version_id,
+            repo_id=repo_id,
+            scan_id=scan_id,
+            commit_hash=commit_hash
+        )
+        db.add(version)
 
         file_records: List[GraphFile] = []
         symbol_records: List[Symbol] = []
@@ -77,7 +97,7 @@ class GraphService:
             file_id = _uuid()
             file_rec = GraphFile(
                 id=file_id,
-                repo_id=repo_id,
+                version_id=version_id, # Link to version, not repo directly
                 path=analysis.relative_path,
                 module_name=analysis.module_name,
             )
@@ -101,7 +121,7 @@ class GraphService:
                 if sym_info.type == "module":
                     module_symbol_ids[analysis.module_name] = sym_id
 
-        # 4. Resolve edges
+        # 4. Resolve edges (logic unchanged, just using new records)
         # 4a. defines: module → class/function
         for analysis in analyses:
             module_qname = analysis.module_name
@@ -128,10 +148,8 @@ class GraphService:
 
             for imp in analysis.imports:
                 target_module = imp.module
-                # Try exact match, then partial
                 target_sid = module_symbol_ids.get(target_module)
                 if not target_sid:
-                    # Try matching by suffix (e.g. "app.config" matches repo's "app.config")
                     for mname, sid in module_symbol_ids.items():
                         if mname.endswith(target_module) or target_module.endswith(mname):
                             target_sid = sid
@@ -156,7 +174,6 @@ class GraphService:
                 if not caller_sid:
                     continue
 
-                # Try to resolve callee
                 callee_sid = GraphService._resolve_callee(
                     call.callee_name, analysis.module_name, symbol_id_by_qname
                 )
@@ -168,36 +185,29 @@ class GraphService:
                         relation=EdgeRelation.calls,
                     ))
 
-        # 5. Persist — single transaction, bulk insert
-        # Clear previous graph for this scan_id first
-        existing = await db.execute(
-            select(Repository).where(Repository.scan_id == scan_id)
-        )
-        old_repo = existing.scalar_one_or_none()
-        if old_repo:
-            await db.delete(old_repo)
-            await db.flush()
-
-        db.add(repo)
+        # 5. Persist
         db.add_all(file_records)
         db.add_all(symbol_records)
         db.add_all(edge_records)
         await db.commit()
 
         logger.info(
-            f"[{scan_id}] Graph persisted: "
+            f"[{scan_id}] Graph persisted (v={version_id}): "
             f"{len(file_records)} files, {len(symbol_records)} symbols, {len(edge_records)} edges"
         )
 
     @staticmethod
     async def get_graph(scan_id: str, db: AsyncSession) -> GraphResponse:
         """Query the persisted graph and return serialized response."""
-        # Find repo
+        from app.models.version import RepoVersion
+
+        # Find version by scan_id
         result = await db.execute(
-            select(Repository).where(Repository.scan_id == scan_id)
+            select(RepoVersion).where(RepoVersion.scan_id == scan_id)
         )
-        repo = result.scalar_one_or_none()
-        if not repo:
+        version = result.scalar_one_or_none()
+        
+        if not version:
             return GraphResponse(
                 scan_id=scan_id,
                 total_files=0,
@@ -210,7 +220,7 @@ class GraphService:
 
         # Load files
         files_result = await db.execute(
-            select(GraphFile).where(GraphFile.repo_id == repo.id)
+            select(GraphFile).where(GraphFile.version_id == version.id)
         )
         files = files_result.scalars().all()
         file_path_map = {f.id: f.path for f in files}

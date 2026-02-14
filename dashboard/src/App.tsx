@@ -5,6 +5,7 @@ import { MetricsDashboard } from './components/MetricsDashboard';
 import { GatewayPlayground } from './components/GatewayPlayground';
 import { GraphViewer } from './components/GraphViewer';
 import { RepoChat } from './components/RepoChat';
+import { AgentChat } from './components/AgentChat';
 import { ImpactSimulator } from './components/ImpactSimulator';
 import { CostDashboard } from './components/CostDashboard';
 import { apiService } from './services/repoService';
@@ -28,7 +29,8 @@ function App() {
     { id: 'scanner', label: 'Repo Scanner', icon: '🔍' },
     { id: 'graph', label: 'Graph', icon: '🧠' },
     { id: 'metrics', label: 'Metrics', icon: '📊' },
-    { id: 'gateway', label: 'AI Gateway', icon: '🤖' },
+    { id: 'agent', label: 'Agent', icon: '🤖' },
+    { id: 'gateway', label: 'AI Gateway', icon: '🔌' },
   ];
 
   return (
@@ -127,6 +129,26 @@ function App() {
           <div className="space-y-6">
             <MetricsDashboard />
             <CostDashboard />
+          </div>
+        )}
+
+        {/* Agent Page */}
+        {activePage === 'agent' && (
+          <div className="h-[calc(100vh-8rem)]">
+            <h2 className="text-2xl font-bold text-white mb-4 text-center">Autonomous Code Agent</h2>
+            {activeRepoId ? (
+              <AgentChat repoId={activeRepoId} />
+            ) : (
+              <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
+                <p className="text-gray-500 text-sm">Scan a repository first to use the agent.</p>
+                <button
+                  onClick={() => setActivePage('scanner')}
+                  className="mt-3 px-4 py-2 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-500 transition-colors"
+                >
+                  Go to Scanner →
+                </button>
+              </div>
+            )}
           </div>
         )}
 

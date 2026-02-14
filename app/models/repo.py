@@ -23,6 +23,8 @@ class ScanStats(BaseModel):
 
 class ScanResult(BaseModel):
     scanId: str
+    repoId: Optional[str] = None # Added for version lookup
+    rootPath: Optional[str] = None # Physical path for agent tools
     status: ScanStatus
     stats: Optional[ScanStats] = None
     error: Optional[str] = None

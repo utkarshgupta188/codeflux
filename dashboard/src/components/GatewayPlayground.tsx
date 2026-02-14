@@ -89,7 +89,7 @@ export const GatewayPlayground: React.FC = () => {
                                 {(provider === 'groq' || !provider) && (
                                     <optgroup label="Groq Models">
                                         <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
-                                        <option value="llama3-70b-8192">Llama 3 70B</option>
+                                        <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
                                         <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
                                         <option value="gemma-7b-it">Gemma 7B</option>
                                     </optgroup>

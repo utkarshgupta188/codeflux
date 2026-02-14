@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException
@@ -18,6 +19,8 @@ from app.services.context_builder import ContextBuilder
 from app.services.impact_service import ImpactService
 from app.models.repo import RepoScanRequest, ScanResult, RepoHealth
 from app.models.graph_schemas import GraphResponse
+from app.models.graph import Repository, GraphFile, Symbol, Edge
+from app.models.version import RepoVersion
 from pydantic import BaseModel
 
 # Setup Logging
@@ -333,3 +336,22 @@ async def simulate_change(
         total_affected=result.total_affected,
         circular_risk=result.circular_risk,
     )
+
+# ─── Agent Endpoint ──────────────────────────────────────────
+
+class AgentRequest(BaseModel):
+    prompt: str
+    repo_id: str
+
+@app.post("/agent/run")
+async def run_agent(req: AgentRequest):
+    """Run the autonomous coding agent."""
+    from app.services.agent.agent_service import AgentService
+    try:
+        result = await AgentService.run(req.prompt, req.repo_id)
+        return result
+    except Exception as e:
+        logger.error(f"Agent run failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+ 
+ 

@@ -97,7 +97,6 @@ class ScannerService:
                 repo_storage = os.path.join("data", "repos", scan_id)
                 os.makedirs(repo_storage, exist_ok=True)
                 
-                import subprocess
                 # Clone depth 1 for speed
                 try:
                     # Use sync subprocess in thread for Windows compatibility

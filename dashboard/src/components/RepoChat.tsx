@@ -22,6 +22,32 @@ export function RepoChat({ scanId }: RepoChatProps) {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const STORAGE_KEY = `repo_chat_${scanId}`;
+
+    useEffect(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                setMessages(parsed);
+            } catch (e) {
+                console.error('Failed to load repo chat history', e);
+            }
+        }
+    }, [scanId]);
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+        }
+    }, [messages, scanId]);
+
+    const clearHistory = () => {
+        if (confirm('Are you sure you want to clear the repo chat history?')) {
+            setMessages([]);
+            localStorage.removeItem(STORAGE_KEY);
+        }
+    };
 
     // Auto-scroll on new messages
     useEffect(() => {
@@ -85,8 +111,23 @@ export function RepoChat({ scanId }: RepoChatProps) {
             }}>
                 <span style={{ fontSize: 16 }}>🧠</span>
                 <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: 13 }}>Ask AI about this repository</span>
+                {messages.length > 0 && (
+                    <button
+                        onClick={clearHistory}
+                        style={{
+                            marginLeft: 'auto',
+                            fontSize: 10,
+                            color: '#94a3b8',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                        }}
+                        title="Clear chat history"
+                    >
+                        Clear History
+                    </button>
+                )}
                 <span style={{
-                    marginLeft: 'auto',
                     fontSize: 10,
                     color: '#475569',
                     background: '#1e293b',

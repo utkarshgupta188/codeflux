@@ -117,7 +117,7 @@ class ListFilesTool(AgentTool):
             files = []
             for item in os.listdir(full_path):
                 if item.startswith("."): continue
-                if os.path.isdir(os.path.join(path, item)):
+                if os.path.isdir(os.path.join(full_path, item)):
                     files.append(f"[DIR] {item}")
                 else:
                     files.append(f"[FILE] {item}")

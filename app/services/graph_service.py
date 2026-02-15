@@ -24,7 +24,7 @@ from app.models.graph import (
 from app.models.graph_schemas import (
     SymbolNode, GraphEdge, CyclePath, GraphResponse,
 )
-from app.services.ast_visitor import parse_file, FileAnalysis
+from app.services.universal_parser import parse_file_universal
 
 logger = logging.getLogger("graph.service")
 
@@ -33,6 +33,12 @@ SKIP_DIRS = {
     "node_modules", ".git", "__pycache__", "venv", ".venv",
     "env", ".env", "dist", "build", ".mypy_cache", ".pytest_cache",
     ".tox", "eggs", "*.egg-info",
+}
+
+# Supported file extensions
+SUPPORTED_EXTENSIONS = {
+    '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.go', '.rs',
+    '.cpp', '.cc', '.cxx', '.hpp', '.h', '.c'
 }
 
 
@@ -49,16 +55,16 @@ class GraphService:
         """
         root = Path(repo_path)
 
-        # 1. Collect .py files (sync, but fast)
-        py_files = await asyncio.to_thread(GraphService._walk_python_files, root)
-        logger.info(f"[{scan_id}] Found {len(py_files)} Python files")
+        # 1. Collect source files (all supported languages)
+        source_files = await asyncio.to_thread(GraphService._walk_source_files, root)
+        logger.info(f"[{scan_id}] Found {len(source_files)} source files")
 
-        if not py_files:
-            logger.warning(f"[{scan_id}] No Python files found in {repo_path}")
+        if not source_files:
+            logger.warning(f"[{scan_id}] No source files found in {repo_path}")
             return
 
         # 2. Parse all files (CPU-bound, run in thread)
-        analyses = await asyncio.to_thread(GraphService._parse_all, py_files, root)
+        analyses = await asyncio.to_thread(GraphService._parse_all, source_files, root)
         logger.info(f"[{scan_id}] Parsed {len(analyses)} files successfully")
 
         # 3. Build DB entities
@@ -244,7 +250,7 @@ class GraphService:
                 id=s.id,
                 name=s.name,
                 qualified_name=s.qualified_name,
-                type=s.type.value if hasattr(s.type, 'value') else str(s.type),
+                type=str(s.type.value if hasattr(s.type, 'value') else s.type),
                 file=file_path_map.get(s.file_id, "unknown"),
                 start_line=s.start_line,
                 end_line=s.end_line,
@@ -257,7 +263,7 @@ class GraphService:
             GraphEdge(
                 source_id=e.source_id,
                 target_id=e.target_id,
-                relation=e.relation.value if hasattr(e.relation, 'value') else str(e.relation),
+                relation=str(e.relation.value if hasattr(e.relation, 'value') else e.relation),
             )
             for e in edges
             if e.target_id in symbol_ids  # Only include edges with valid targets
@@ -279,9 +285,9 @@ class GraphService:
     # ── Private ──────────────────────────────────────
 
     @staticmethod
-    def _walk_python_files(root: Path) -> List[Path]:
-        """Collect all .py files, skipping ignored directories."""
-        py_files = []
+    def _walk_source_files(root: Path) -> List[Path]:
+        """Collect all supported source files, skipping ignored directories."""
+        source_files = []
         for dirpath, dirnames, filenames in os.walk(root):
             # Prune ignored dirs in-place
             dirnames[:] = [
@@ -289,16 +295,17 @@ class GraphService:
                 if d not in SKIP_DIRS and not d.endswith(".egg-info")
             ]
             for fname in filenames:
-                if fname.endswith(".py"):
-                    py_files.append(Path(dirpath) / fname)
-        return py_files
+                # Check if file has a supported extension
+                if any(fname.endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                    source_files.append(Path(dirpath) / fname)
+        return source_files
 
     @staticmethod
-    def _parse_all(files: List[Path], root: Path) -> List[FileAnalysis]:
+    def _parse_all(files: List[Path], root: Path) -> List:
         """Parse all files, skipping failures."""
         results = []
         for fp in files:
-            analysis = parse_file(fp, root)
+            analysis = parse_file_universal(fp, root)
             if analysis:
                 results.append(analysis)
         return results
@@ -365,7 +372,7 @@ class GraphService:
             adj: Dict[str, List[str]] = defaultdict(list)
             filtered = [
                 e for e in edges
-                if (e.relation.value if hasattr(e.relation, 'value') else str(e.relation)) == relation_type
+                if str(e.relation.value if hasattr(e.relation, 'value') else e.relation) == relation_type
             ]
 
             for e in filtered:

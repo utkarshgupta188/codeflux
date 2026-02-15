@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { RepoScanner } from './components/RepoScanner';
 import { HealthDashboard } from './components/HealthDashboard';
-import { MetricsDashboard } from './components/MetricsDashboard';
-import { GatewayPlayground } from './components/GatewayPlayground';
 import { GraphViewer } from './components/GraphViewer';
 import { RepoChat } from './components/RepoChat';
 import { AgentChat } from './components/AgentChat';
 import { ImpactSimulator } from './components/ImpactSimulator';
-import { CostDashboard } from './components/CostDashboard';
+import { CodeSearch } from './components/CodeSearch';
+import { DocsGenerator } from './components/DocsGenerator';
+import { DiffViewer } from './components/DiffViewer';
 import { apiService } from './services/repoService';
 import type { PageId } from './types';
 
@@ -27,10 +27,9 @@ function App() {
 
   const navItems: { id: PageId; label: string; icon: string }[] = [
     { id: 'scanner', label: 'Repo Scanner', icon: '🔍' },
-    { id: 'graph', label: 'Graph', icon: '🧠' },
-    { id: 'metrics', label: 'Metrics', icon: '📊' },
-    { id: 'agent', label: 'Agent', icon: '🤖' },
-    { id: 'gateway', label: 'AI Gateway', icon: '🔌' },
+    { id: 'tools', label: 'Dev Tools', icon: '🛠️' },
+    { id: 'graph', label: 'Code Graph', icon: '🧠' },
+    { id: 'agent', label: 'AI Agent', icon: '🤖' },
   ];
 
   return (
@@ -44,7 +43,7 @@ function App() {
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight text-white leading-none">CodeFlux</h1>
-              <p className="text-[10px] text-gray-500 tracking-widest uppercase">AI Gateway Dashboard</p>
+              <p className="text-[10px] text-gray-500 tracking-widest uppercase">Code Analysis Platform</p>
             </div>
           </div>
 
@@ -95,18 +94,10 @@ function App() {
       {/* Main Content */}
       <main className={`flex-1 mx-auto w-full px-6 py-8 ${activePage === 'graph' ? 'max-w-[1400px]' : 'max-w-6xl'}`}>
         {/* Repo Scanner Page */}
-        {activePage === 'scanner' && (
-          <div className="space-y-8">
+        <div className={activePage === 'scanner' ? 'space-y-8' : 'hidden'}>
             <div className="text-center mb-2">
-              <h2 className="text-2xl font-bold text-white mb-1">Repository Health Analysis</h2>
-              <p className="text-gray-500 text-sm">Scan any codebase for complexity, dependencies, and hotspots</p>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto">
-              <FeatureCard icon="📊" title="Static Analysis" desc="Symbols & LOC" />
-              <FeatureCard icon="📦" title="Dependency Scan" desc="npm & pip" />
-              <FeatureCard icon="🔥" title="Hotspot Detection" desc="Complexity scoring" />
-              <FeatureCard icon="🩺" title="Health Score" desc="Risk assessment" />
+              <h2 className="text-2xl font-bold text-white mb-1">Repository Analysis</h2>
+              <p className="text-gray-500 text-sm">Scan your codebase for complexity, dependencies, and structure</p>
             </div>
 
             <RepoScanner onScanComplete={setActiveRepoId} />
@@ -121,21 +112,11 @@ function App() {
                 <HealthDashboard repoId={activeRepoId} />
               </div>
             )}
-          </div>
-        )}
-
-        {/* Metrics Page */}
-        {activePage === 'metrics' && (
-          <div className="space-y-6">
-            <MetricsDashboard />
-            <CostDashboard />
-          </div>
-        )}
+        </div>
 
         {/* Agent Page */}
-        {activePage === 'agent' && (
-          <div className="h-[calc(100vh-8rem)]">
-            <h2 className="text-2xl font-bold text-white mb-4 text-center">Autonomous Code Agent</h2>
+        <div className={activePage === 'agent' ? 'h-[calc(100vh-8rem)]' : 'hidden'}>
+            <h2 className="text-2xl font-bold text-white mb-4 text-center">AI Code Agent</h2>
             {activeRepoId ? (
               <AgentChat repoId={activeRepoId} />
             ) : (
@@ -149,18 +130,51 @@ function App() {
                 </button>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
-        {/* Gateway Playground Page */}
-        {activePage === 'gateway' && <GatewayPlayground />}
+        {/* Code Search Page */}
+        <div className={activePage === 'search' ? '' : 'hidden'}>
+            {activeRepoId ? (
+              <CodeSearch scanId={activeRepoId} />
+            ) : (
+              <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
+                <p className="text-gray-500 text-sm">Scan a repository first to search code.</p>
+                <button
+                  onClick={() => setActivePage('scanner')}
+                  className="mt-3 px-4 py-2 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-500 transition-colors"
+                >
+                  Go to Scanner →
+                </button>
+              </div>
+            )}
+        </div>
+
+        {/* Dev Tools Page */}
+        <div className={activePage === 'tools' ? '' : 'hidden'}>
+            {activeRepoId ? (
+              <div className="space-y-6">
+                <CodeSearch scanId={activeRepoId} />
+                <DocsGenerator scanId={activeRepoId} />
+                <DiffViewer scanId={activeRepoId} />
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
+                <p className="text-gray-500 text-sm">Scan a repository first to use developer tools.</p>
+                <button
+                  onClick={() => setActivePage('scanner')}
+                  className="mt-3 px-4 py-2 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-500 transition-colors"
+                >
+                  Go to Scanner →
+                </button>
+              </div>
+            )}
+        </div>
 
         {/* Graph Visualization Page */}
-        {activePage === 'graph' && (
-          <div className="space-y-4">
+        <div className={activePage === 'graph' ? 'space-y-4' : 'hidden'}>
             <div className="text-center mb-2">
-              <h2 className="text-2xl font-bold text-white mb-1">Code Intelligence</h2>
-              <p className="text-gray-500 text-sm">AST graph visualization & AI-powered Q&A</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Code Graph & Analysis</h2>
+              <p className="text-gray-500 text-sm">Visualize code structure and simulate change impact</p>
             </div>
             {activeRepoId ? (
               <>
@@ -181,28 +195,19 @@ function App() {
                 </button>
               </div>
             )}
-          </div>
-        )}
+        </div>
       </main>
 
       {/* Footer */}
       <footer className="border-t border-dark-700 py-4 mt-auto">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between text-xs text-gray-600">
           <span>CodeFlux © 2026</span>
-          <span className="hidden sm:inline">React + Vite + TailwindCSS + FastAPI</span>
+          <span className="hidden sm:inline">AI-Powered Code Analysis Platform</span>
           <span className="font-mono text-gray-700">v1.0.0</span>
         </div>
       </footer>
     </div>
   );
 }
-
-const FeatureCard = ({ icon, title, desc }: { icon: string; title: string; desc: string }) => (
-  <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-3 text-center hover:border-primary-500/30 transition-colors group">
-    <div className="text-xl mb-1 group-hover:scale-110 transition-transform inline-block">{icon}</div>
-    <div className="text-xs font-semibold text-gray-300">{title}</div>
-    <div className="text-[10px] text-gray-600">{desc}</div>
-  </div>
-);
 
 export default App;

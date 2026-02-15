@@ -118,7 +118,7 @@ class ImpactService:
         forward: Dict[str, List[tuple]] = {}
         reverse: Dict[str, List[tuple]] = {}
         for e in edges:
-            rel = e.relation.value if hasattr(e.relation, 'value') else str(e.relation)
+            rel = str(e.relation.value if hasattr(e.relation, 'value') else e.relation)
             forward.setdefault(e.source_id, []).append((e.target_id, rel))
             reverse.setdefault(e.target_id, []).append((e.source_id, rel))
 

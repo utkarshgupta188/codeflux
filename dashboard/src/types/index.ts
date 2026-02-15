@@ -128,6 +128,36 @@ export interface SimulateChangeResponse {
     circular_risk: boolean;
 }
 
+// Documentation Generator Types
+export type DocsScope = 'file' | 'folder' | 'repo';
+
+export interface GenerateDocsRequest {
+    scope?: DocsScope;
+    path?: string | null;
+    file?: string | null;
+    symbol?: string | null;
+    format?: 'markdown' | 'html' | 'docstring';
+    max_files?: number | null;
+    max_chars?: number | null;
+}
+
+export interface GenerateDocsStats {
+    files_scanned: number;
+    files_included: number;
+    total_chars: number;
+    max_files: number;
+    max_chars: number;
+}
+
+export interface GenerateDocsResponse {
+    documentation: string;
+    format: string;
+    generated_for: string;
+    included_files: string[];
+    truncated: boolean;
+    stats: GenerateDocsStats;
+}
+
 // Cost Metrics Types
 export interface ProviderCostInfo {
     daily_cost_usd: number;
@@ -151,4 +181,4 @@ export interface CostMetricsResponse {
 }
 
 // Navigation
-export type PageId = 'scanner' | 'metrics' | 'gateway' | 'graph' | 'agent';
+export type PageId = 'scanner' | 'tools' | 'graph' | 'agent';

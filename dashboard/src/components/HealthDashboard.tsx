@@ -10,6 +10,7 @@ export const HealthDashboard: React.FC<Props> = ({ repoId }) => {
     const [health, setHealth] = useState<RepoHealth | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
         const fetchHealth = async () => {
@@ -26,6 +27,39 @@ export const HealthDashboard: React.FC<Props> = ({ repoId }) => {
         };
         if (repoId) fetchHealth();
     }, [repoId]);
+
+    const handleExport = async (format: 'json' | 'markdown' | 'html') => {
+        setExporting(true);
+        try {
+            const response = await fetch(`http://localhost:8000/repo/${repoId}/export`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    format,
+                    include_graph: true,
+                    include_health: true,
+                    include_hotspots: true,
+                }),
+            });
+
+            if (!response.ok) throw new Error('Export failed');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `codeflux-report-${repoId}.${format === 'markdown' ? 'md' : format}`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (err) {
+            console.error('Export failed:', err);
+            alert('Export failed. Please try again.');
+        } finally {
+            setExporting(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -57,6 +91,40 @@ export const HealthDashboard: React.FC<Props> = ({ repoId }) => {
 
     return (
         <div className="space-y-6">
+            {/* Export Buttons */}
+            <div className="flex justify-end gap-2">
+                <button
+                    onClick={() => handleExport('json')}
+                    disabled={exporting}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export JSON
+                </button>
+                <button
+                    onClick={() => handleExport('markdown')}
+                    disabled={exporting}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export MD
+                </button>
+                <button
+                    onClick={() => handleExport('html')}
+                    disabled={exporting}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export HTML
+                </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Risk Score Card */}
                 <div className="card md:col-span-1 relative overflow-hidden">

@@ -95,24 +95,19 @@ OR if you have the answer:
                 
                 # We'll use a direct call pattern simulating the router's provider call
                 # But wait, router.route_request returns ChatResponse. we need the text.
-                
+
                 from app.models.api import ChatRequest
-                req = ChatRequest(
-                    prompt=json.dumps(messages), # Hacky: passing full history as prompt? 
-                    # No, we need a proper chat completion interface.
-                    # The current router is designed for single-turn Q&A context.
-                    # Let's try to construct a prompt from messages manually.
-                    system_prompt=messages[0]["content"]
-                )
-                
                 # Construct the actual prompt for the model from history
                 history_text = ""
                 for m in messages[1:]:
                    history_text += f"{m['role'].upper()}: {m['content']}\n"
-                
-                req.prompt = history_text
-                req.preferred_provider = "groq" # Fast inference
-                req.preferred_model = "llama-3.3-70b-versatile" # reliable json
+
+                req = ChatRequest(
+                    prompt=history_text,
+                    system_prompt=messages[0]["content"],  # Pass the system prompt separately
+                    preferred_provider="groq", # Fast inference
+                    preferred_model="llama-3.3-70b-versatile" # reliable json
+                )
 
                 response = await router.route_request(req)
                 content = response["response"]

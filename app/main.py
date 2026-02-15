@@ -2,10 +2,12 @@ import logging
 import asyncio
 import sys
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.utils.db import get_db, engine, Base
 from app.models.api import ChatRequest, ChatResponse
@@ -130,6 +132,10 @@ async def chat_endpoint(
         if 'latency_ms' not in locals():
              latency_ms = (time.time() - start_time) * 1000
 
+        # Define result if not already defined (in case of exception)
+        if 'result' not in locals():
+            result = {}
+
         background_tasks.add_task(
             log_request_background,
             prompt=request.prompt,
@@ -137,9 +143,9 @@ async def chat_endpoint(
             model=model,
             latency_ms=latency_ms,
             fallback_used=fallback_used,
-            tokens_used=result.get("tokens_used", 0) if 'result' in locals() else 0,
-            estimated_cost=result.get("estimated_cost", 0.0) if 'result' in locals() else 0.0,
-            routing_reason=result.get("routing_reason") if 'result' in locals() else None,
+            tokens_used=result.get("tokens_used", 0),
+            estimated_cost=result.get("estimated_cost", 0.0),
+            routing_reason=result.get("routing_reason"),
         )
 
 @app.get("/metrics/summary", response_model=MetricsSummary)
@@ -353,5 +359,248 @@ async def run_agent(req: AgentRequest):
     except Exception as e:
         logger.error(f"Agent run failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
- 
- 
+
+
+# ─── Code Search Endpoint ──────────────────────────────────────
+
+class CodeSearchRequest(BaseModel):
+    query: str
+    file_type: str | None = None
+    symbol_type: str | None = None
+    case_sensitive: bool = False
+    regex: bool = False
+    limit: int = 100
+
+class SearchResult(BaseModel):
+    file: str
+    line: int
+    content: str
+    symbol: str | None = None
+    symbol_type: str | None = None
+
+class CodeSearchResponse(BaseModel):
+    results: list[SearchResult]
+    total_matches: int
+    truncated: bool
+
+@app.post("/repo/{scan_id}/search", response_model=CodeSearchResponse)
+async def search_code(
+    scan_id: str,
+    body: CodeSearchRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Full-text code search with filters.
+    Searches through all files in the scanned repository.
+    """
+    from app.services.search_service import SearchService
+
+    try:
+        result = await SearchService.search(
+            scan_id=scan_id,
+            query=body.query,
+            file_type=body.file_type,
+            symbol_type=body.symbol_type,
+            case_sensitive=body.case_sensitive,
+            regex=body.regex,
+            limit=body.limit,
+            db=db,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Documentation Generator ──────────────────────────────────
+
+class GenerateDocsRequest(BaseModel):
+    scope: str = "file"  # file | folder | repo
+    path: str | None = None
+    file: Optional[str] = None  # legacy support
+    symbol: str | None = None
+    format: str = "markdown"  # markdown | html | docstring
+    max_files: int | None = None
+    max_chars: int | None = None
+
+    def model_post_init(self, __context):
+        if self.path is None and self.file:
+            self.path = self.file
+        if self.path is not None and self.file is None:
+            self.file = self.path
+
+    @property
+    def resolved_path(self) -> str | None:
+        return self.path or self.file
+
+class GenerateDocsResponse(BaseModel):
+    documentation: str
+    format: str
+    generated_for: str
+    included_files: list[str]
+    truncated: bool
+    stats: dict
+
+@app.post("/repo/{scan_id}/generate-docs", response_model=GenerateDocsResponse)
+async def generate_docs(
+    scan_id: str,
+    body: GenerateDocsRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    AI-powered documentation generation for code.
+    Analyzes code structure and generates comprehensive documentation.
+    """
+    from app.services.docs_service import DocsService
+
+    try:
+        if body.scope != "file":
+            raise ValueError("Folder and repo scopes have been disabled. Please use file scope instead.")
+
+        result = await DocsService.generate(
+            scan_id=scan_id,
+            scope=body.scope,
+            path=body.resolved_path,
+            symbol=body.symbol,
+            format=body.format,
+            max_files=body.max_files,
+            max_chars=body.max_chars,
+            db=db,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Documentation generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Export & Reporting ──────────────────────────────────────
+
+class ExportRequest(BaseModel):
+    format: str = "json"  # json | markdown | html
+    include_graph: bool = True
+    include_health: bool = True
+    include_hotspots: bool = True
+
+from fastapi.responses import StreamingResponse
+import json as json_lib
+
+@app.post("/repo/{scan_id}/export")
+async def export_report(
+    scan_id: str,
+    body: ExportRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export repository analysis as JSON, Markdown, or HTML report.
+    """
+    from app.services.export_service import ExportService
+
+    try:
+        result = await ExportService.export(
+            scan_id=scan_id,
+            format=body.format,
+            include_graph=body.include_graph,
+            include_health=body.include_health,
+            include_hotspots=body.include_hotspots,
+            db=db,
+        )
+
+        # Determine content type and filename
+        if body.format == "json":
+            media_type = "application/json"
+            filename = f"codeflux-report-{scan_id}.json"
+        elif body.format == "markdown":
+            media_type = "text/markdown"
+            filename = f"codeflux-report-{scan_id}.md"
+        else:  # html
+            media_type = "text/html"
+            filename = f"codeflux-report-{scan_id}.html"
+
+        return StreamingResponse(
+            iter([result]),
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Export failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Version History & Diff Viewer ──────────────────────────────
+
+@app.get("/repo/{repo_id}/versions")
+async def get_versions(repo_id: str, db: AsyncSession = Depends(get_db)):
+    """Get all versions/scans for a repository."""
+    from app.models.version import RepoVersion
+    from app.models.graph import Repository
+
+    # Find repo by scan_id or repo_id
+    repo_result = await db.execute(
+        select(Repository).where(Repository.scan_id == repo_id)
+    )
+    repo = repo_result.scalar_one_or_none()
+
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    # Get all versions for this repo
+    versions_result = await db.execute(
+        select(RepoVersion)
+        .where(RepoVersion.repo_id == repo.id)
+        .order_by(RepoVersion.created_at.desc())
+    )
+    versions = versions_result.scalars().all()
+
+    return [
+        {
+            "version_id": v.id,
+            "scan_id": v.scan_id,
+            "commit_hash": v.commit_hash,
+            "created_at": v.created_at.isoformat() if v.created_at else None,
+        }
+        for v in versions
+    ]
+
+
+class DiffRequest(BaseModel):
+    base_scan_id: str
+    head_scan_id: str
+
+class FileDiff(BaseModel):
+    file: str
+    status: str  # added | removed | modified
+    symbols_added: int
+    symbols_removed: int
+    symbols_modified: int
+
+class DiffResponse(BaseModel):
+    base_scan_id: str
+    head_scan_id: str
+    files_changed: list[FileDiff]
+    total_files_added: int
+    total_files_removed: int
+    total_files_modified: int
+    symbols_changed: int
+
+@app.post("/repo/diff", response_model=DiffResponse)
+async def get_diff(body: DiffRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Compare two scans and show what changed.
+    """
+    from app.services.diff_service import DiffService
+
+    try:
+        result = await DiffService.compare(
+            base_scan_id=body.base_scan_id,
+            head_scan_id=body.head_scan_id,
+            db=db,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Diff comparison failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+

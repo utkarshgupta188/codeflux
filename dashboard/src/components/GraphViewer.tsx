@@ -331,7 +331,7 @@ export function GraphViewer({ scanId }: GraphViewerProps) {
                 fontSize: 13,
                 textAlign: 'center',
             }}>
-                No graph data available. Scan completed with no Python files.
+                No graph data available. Scan completed with no supported source files.
             </div>
         );
     }

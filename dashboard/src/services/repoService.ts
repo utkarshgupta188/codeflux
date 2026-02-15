@@ -1,4 +1,4 @@
-import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse, GraphResponse, RepoAnswer, SimulateChangeResponse, CostMetricsResponse } from '../types';
+import type { RepoScanRequest, ScanResult, RepoHealth, MetricsSummary, TimeRange, ChatRequest, ChatResponse, GraphResponse, RepoAnswer, SimulateChangeResponse, CostMetricsResponse, GenerateDocsRequest, GenerateDocsResponse } from '../types';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -106,7 +106,11 @@ class ApiService {
     }
 
     async getDiff(repoId: string, base: string, head: string): Promise<any> {
-        const response = await fetch(`${API_BASE}/repo/${repoId}/diff?base=${base}&head=${head}`);
+        const response = await fetch(`${API_BASE}/repo/diff`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ base_scan_id: base, head_scan_id: head })
+        });
         if (!response.ok) throw new Error('Failed to fetch diff');
         return response.json();
     }
@@ -118,6 +122,35 @@ class ApiService {
             body: JSON.stringify({ repo_id: repoId, prompt })
         });
         if (!response.ok) throw new Error('Agent run failed');
+        return response.json();
+    }
+
+    // ─── Code Search ─────────────────────────────────────────
+    async searchCode(scanId: string, searchParams: {
+        query: string;
+        file_type?: string | null;
+        symbol_type?: string | null;
+        case_sensitive?: boolean;
+        regex?: boolean;
+        limit?: number;
+    }): Promise<any> {
+        const response = await fetch(`${API_BASE}/repo/${scanId}/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(searchParams)
+        });
+        if (!response.ok) throw new Error('Search failed');
+        return response.json();
+    }
+
+    // ─── Documentation Generator ─────────────────────────────
+    async generateDocs(scanId: string, params: GenerateDocsRequest): Promise<GenerateDocsResponse> {
+        const response = await fetch(`${API_BASE}/repo/${scanId}/generate-docs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        if (!response.ok) throw new Error('Documentation generation failed');
         return response.json();
     }
 }

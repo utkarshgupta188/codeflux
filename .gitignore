@@ -39,3 +39,14 @@ postgres_data/
 # IDE
 .vscode/
 .idea/
+
+# Claude Code and local/dev logs
+.claude/
+backend.log
+dashboard.log
+
+# Ignore all data artifacts and folders
+data/
+
+# Junk/Invalid Unicode/Windows artifact
+D??codefluxappservicesdiff_service.py

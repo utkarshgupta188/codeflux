@@ -39,3 +39,7 @@ class RepoHealth(BaseModel):
     circularDependencies: int
     complexityScore: int
     hotspots: List[Hotspot]
+
+class ReadmeResponse(BaseModel):
+    repoId: str
+    content: str

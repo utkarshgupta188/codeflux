@@ -115,19 +115,17 @@ class ScannerService:
                 except FileNotFoundError:
                     raise ValueError("Git not installed on server")
                 
+                # Clone complete
                 scan_path = repo_storage
                 # Set rootPath for agent
                 ScannerService.SCANS[scan_id].rootPath = scan_path
                 stats, complexities = ScannerService._scan_directory(scan_path)
                 
-                # Build graph
                 ScannerService.SCANS[scan_id].stats = stats
                 ScannerService.SCANS[scan_id].status = ScanStatus.completed
                 ScannerService._generate_health(scan_id, stats, complexities)
                 
-                # Get commit hash for GitHub repo
-                commit_hash = await ScannerService._get_git_commit(scan_path)
-                await ScannerService._build_graph(scan_id, scan_path, commit_hash)
+                ScannerService._save_state()
                 return 
             
             ScannerService.SCANS[scan_id].stats = stats
@@ -135,11 +133,6 @@ class ScannerService:
             
             # Generate Health Data using real stats
             ScannerService._generate_health(scan_id, stats, complexities)
-            
-            # Trigger AST graph build for local repos
-            if scan_path:
-                commit_hash = await ScannerService._get_git_commit(scan_path)
-                asyncio.create_task(ScannerService._build_graph(scan_id, scan_path, commit_hash))
             
             ScannerService._save_state()
         except Exception as e:
@@ -167,35 +160,6 @@ class ScannerService:
         except Exception:
             return "unknown"
 
-    @staticmethod
-    async def _build_graph(scan_id: str, path: str, commit_hash: str):
-        """Run AST graph analysis with its own DB session."""
-        try:
-            from app.utils.db import AsyncSessionLocal
-            from app.services.graph_service import GraphService
-            async with AsyncSessionLocal() as session:
-                # build_graph now needs to return the repo_id or we need to query it
-                # GraphService.build_graph is void. 
-                # Let's Modify GraphService.build_graph to return repo_id? 
-                # Or just query it here.
-                
-                await GraphService.build_graph(scan_id, path, commit_hash, session)
-                
-                # Fetch repo_id to update ScanResult
-                from app.models.version import RepoVersion
-                from sqlalchemy import select
-                result = await session.execute(select(RepoVersion).where(RepoVersion.scan_id == scan_id))
-                version = result.scalar_one_or_none()
-                
-                if version and scan_id in ScannerService.SCANS:
-                    ScannerService.SCANS[scan_id].repoId = version.repo_id
-
-                logger.info(f"[{scan_id}] Graph build complete (commit={commit_hash})")
-        except Exception as e:
-            logger.error(f"[{scan_id}] Graph build failed: {e}")
-            if scan_id in ScannerService.SCANS:
-                ScannerService.SCANS[scan_id].status = ScanStatus.failed
-                ScannerService.SCANS[scan_id].error = f"Graph build failed: {str(e)}"
 
     @staticmethod
     def _scan_directory(path: str) -> Tuple[ScanStats, List[Tuple[str, int]]]:

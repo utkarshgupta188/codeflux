@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
 import { RepoScanner } from './components/RepoScanner';
 import { HealthDashboard } from './components/HealthDashboard';
-import { GraphViewer } from './components/GraphViewer';
-import { RepoChat } from './components/RepoChat';
 import { AgentChat } from './components/AgentChat';
-import { ImpactSimulator } from './components/ImpactSimulator';
-import { CodeSearch } from './components/CodeSearch';
-import { DocsGenerator } from './components/DocsGenerator';
-import { DiffViewer } from './components/DiffViewer';
 import { apiService } from './services/repoService';
 import type { PageId } from './types';
 
@@ -27,8 +21,6 @@ function App() {
 
   const navItems: { id: PageId; label: string; icon: string }[] = [
     { id: 'scanner', label: 'Repo Scanner', icon: '🔍' },
-    { id: 'tools', label: 'Dev Tools', icon: '🛠️' },
-    { id: 'graph', label: 'Code Graph', icon: '🧠' },
     { id: 'agent', label: 'AI Agent', icon: '🤖' },
   ];
 
@@ -92,109 +84,44 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className={`flex-1 mx-auto w-full px-6 py-8 ${activePage === 'graph' ? 'max-w-[1400px]' : 'max-w-6xl'}`}>
+      <main className="flex-1 mx-auto w-full px-6 py-8 max-w-6xl">
         {/* Repo Scanner Page */}
         <div className={activePage === 'scanner' ? 'space-y-8' : 'hidden'}>
-            <div className="text-center mb-2">
-              <h2 className="text-2xl font-bold text-white mb-1">Repository Analysis</h2>
-              <p className="text-gray-500 text-sm">Scan your codebase for complexity, dependencies, and structure</p>
-            </div>
+          <div className="text-center mb-2">
+            <h2 className="text-2xl font-bold text-white mb-1">Repository Analysis</h2>
+            <p className="text-gray-500 text-sm">Scan your codebase for complexity, dependencies, and structure</p>
+          </div>
 
-            <RepoScanner onScanComplete={setActiveRepoId} />
+          <RepoScanner onScanComplete={setActiveRepoId} />
 
-            {activeRepoId && (
-              <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-px flex-1 bg-dark-700" />
-                  <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Analysis Results</h2>
-                  <div className="h-px flex-1 bg-dark-700" />
-                </div>
-                <HealthDashboard repoId={activeRepoId} />
+          {activeRepoId && (
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-px flex-1 bg-dark-700" />
+                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Analysis Results</h2>
+                <div className="h-px flex-1 bg-dark-700" />
               </div>
-            )}
+              <HealthDashboard repoId={activeRepoId} />
+            </div>
+          )}
         </div>
 
         {/* Agent Page */}
         <div className={activePage === 'agent' ? 'h-[calc(100vh-8rem)]' : 'hidden'}>
-            <h2 className="text-2xl font-bold text-white mb-4 text-center">AI Code Agent</h2>
-            {activeRepoId ? (
-              <AgentChat repoId={activeRepoId} />
-            ) : (
-              <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
-                <p className="text-gray-500 text-sm">Scan a repository first to use the agent.</p>
-                <button
-                  onClick={() => setActivePage('scanner')}
-                  className="mt-3 px-4 py-2 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-500 transition-colors"
-                >
-                  Go to Scanner →
-                </button>
-              </div>
-            )}
-        </div>
-
-        {/* Code Search Page */}
-        <div className={activePage === 'search' ? '' : 'hidden'}>
-            {activeRepoId ? (
-              <CodeSearch scanId={activeRepoId} />
-            ) : (
-              <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
-                <p className="text-gray-500 text-sm">Scan a repository first to search code.</p>
-                <button
-                  onClick={() => setActivePage('scanner')}
-                  className="mt-3 px-4 py-2 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-500 transition-colors"
-                >
-                  Go to Scanner →
-                </button>
-              </div>
-            )}
-        </div>
-
-        {/* Dev Tools Page */}
-        <div className={activePage === 'tools' ? '' : 'hidden'}>
-            {activeRepoId ? (
-              <div className="space-y-6">
-                <CodeSearch scanId={activeRepoId} />
-                <DocsGenerator scanId={activeRepoId} />
-                <DiffViewer scanId={activeRepoId} />
-              </div>
-            ) : (
-              <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
-                <p className="text-gray-500 text-sm">Scan a repository first to use developer tools.</p>
-                <button
-                  onClick={() => setActivePage('scanner')}
-                  className="mt-3 px-4 py-2 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-500 transition-colors"
-                >
-                  Go to Scanner →
-                </button>
-              </div>
-            )}
-        </div>
-
-        {/* Graph Visualization Page */}
-        <div className={activePage === 'graph' ? 'space-y-4' : 'hidden'}>
-            <div className="text-center mb-2">
-              <h2 className="text-2xl font-bold text-white mb-1">Code Graph & Analysis</h2>
-              <p className="text-gray-500 text-sm">Visualize code structure and simulate change impact</p>
+          <h2 className="text-2xl font-bold text-white mb-4 text-center">AI Code Agent</h2>
+          {activeRepoId ? (
+            <AgentChat repoId={activeRepoId} />
+          ) : (
+            <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
+              <p className="text-gray-500 text-sm">Scan a repository first to use the agent.</p>
+              <button
+                onClick={() => setActivePage('scanner')}
+                className="mt-3 px-4 py-2 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-500 transition-colors"
+              >
+                Go to Scanner →
+              </button>
             </div>
-            {activeRepoId ? (
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <GraphViewer scanId={activeRepoId} />
-                  <RepoChat scanId={activeRepoId} />
-                </div>
-                <ImpactSimulator scanId={activeRepoId} />
-              </>
-            ) : (
-              <div className="text-center py-16 bg-dark-800/50 rounded-xl border border-dark-700">
-                <p className="text-gray-500 text-sm">Scan a repository first to visualize its code graph.</p>
-                <button
-                  onClick={() => setActivePage('scanner')}
-                  className="mt-3 px-4 py-2 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-500 transition-colors"
-                >
-                  Go to Scanner →
-                </button>
-              </div>
-            )}
+          )}
         </div>
       </main>
 

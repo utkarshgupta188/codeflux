@@ -3,10 +3,8 @@ import re
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from app.services.scanner import ScannerService
-from app.services.graph_service import GraphService
 from app.utils.db import AsyncSessionLocal
 from sqlalchemy import select
-from app.models.graph import GraphFile, Symbol, Edge, EdgeRelation
 
 # ─── Tool Definitions ──────────────────────────────────────────────
 

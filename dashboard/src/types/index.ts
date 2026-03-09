@@ -181,4 +181,4 @@ export interface CostMetricsResponse {
 }
 
 // Navigation
-export type PageId = 'scanner' | 'tools' | 'graph' | 'agent';
+export type PageId = 'scanner' | 'agent';

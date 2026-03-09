@@ -27,6 +27,11 @@ export interface RepoHealth {
     }>;
 }
 
+export interface ReadmeResponse {
+    repoId: string;
+    content: string;
+}
+
 // AI Gateway Metrics Types
 export type TimeRange = 'last_1h' | 'last_24h' | 'last_7d';
 
@@ -181,4 +186,4 @@ export interface CostMetricsResponse {
 }
 
 // Navigation
-export type PageId = 'scanner' | 'agent';
+export type PageId = 'scanner' | 'agent' | 'readme';

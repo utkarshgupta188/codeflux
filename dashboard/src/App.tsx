@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { RepoScanner } from './components/RepoScanner';
 import { HealthDashboard } from './components/HealthDashboard';
 import { AgentChat } from './components/AgentChat';
+import { ReadmeGen } from './components/ReadmeGen';
 import { apiService } from './services/repoService';
 import type { PageId } from './types';
 
@@ -21,6 +22,7 @@ function App() {
 
   const navItems: { id: PageId; label: string; icon: string }[] = [
     { id: 'scanner', label: 'Repo Scanner', icon: '🔍' },
+    { id: 'readme', label: 'README Gen', icon: '📝' },
     { id: 'agent', label: 'AI Agent', icon: '🤖' },
   ];
 
@@ -104,6 +106,11 @@ function App() {
               <HealthDashboard repoId={activeRepoId} />
             </div>
           )}
+        </div>
+
+        {/* README Gen Page */}
+        <div className={activePage === 'readme' ? 'block' : 'hidden'}>
+          <ReadmeGen scanId={activeRepoId} />
         </div>
 
         {/* Agent Page */}
